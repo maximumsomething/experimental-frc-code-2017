@@ -1,5 +1,6 @@
 #include <memory>
 #include <vector>
+#include <thread>
 
 #include <Commands/Command.h>
 #include <Commands/Scheduler.h>
@@ -13,21 +14,34 @@
 #include "Commands/ExampleCommand.h"
 #include "CommandBase.h"
 
+#include <opencv2/core/core.hpp>
+#include <opencv2/core/types.hpp>
+
+
+// for access from static functions. ENSURE THREAD SAFETY!
+class Robot;
+Robot* theRobot;
+
 class Robot: public frc::IterativeRobot {
 public:
 	
 	frc::Joystick* stick;
-
-	bool wasPressedCameraToggle = false;
+	
+	
 	
 	void RobotInit() override {
+		theRobot = this;
+		
 		chooser.AddDefault("Default Auto", new ExampleCommand());
 		// chooser.AddObject("My Auto", new MyAutoCommand());
 		frc::SmartDashboard::PutData("Auto Modes", &chooser);
 		
 		CameraServer::GetInstance()->StartAutomaticCapture(0);
 		
-		stick = new frc::Joystick(1);
+		stick = new frc::Joystick(0);
+		
+		std::thread cameraThreadObj(cameraThread);
+		cameraThreadObj.detach();
 	}
 
 	/**
@@ -83,6 +97,37 @@ public:
 			autonomousCommand->Cancel();
 		}
 	}
+	
+	
+	static void cameraThread() {
+		CameraServer::GetInstance()->StartAutomaticCapture(1);
+		CameraServer::GetInstance()->StartAutomaticCapture(0);
+		
+		cs::CvSink frontSink = CameraServer::GetInstance()->GetVideo("cam0");
+		cs::CvSink backSink = CameraServer::GetInstance()->GetVideo("cam1");
+		
+		cs::CvSource output = CameraServer::GetInstance()->PutVideo("Camera", 640, 480);
+		
+		cv::Mat mat;
+		while(true) {
+		// access once for thread safety
+			bool usingFront = theRobot->usingFrontCamera;
+			if (usingFront) pushFrame(frontSink, output, mat);
+			else pushFrame(backSink, output, mat);
+		}
+	}
+	static void pushFrame(cs::CvSink sink, cs::CvSource output, cv::Mat reusableMat) {
+		if (sink.GrabFrame(reusableMat) == 0) {
+			// Send the output the error.
+			output.NotifyError(sink.GetError());
+			// skip the rest of the current iteration
+			return;
+		}
+		
+		output.PutFrame(reusableMat);
+	}
+	
+	
 
 	// system for button handlers.
 	// call from TeleopPeriodic(). If true, call function associated with button.
@@ -98,6 +143,7 @@ public:
 			}
 		}
 		else buttons[button - 1] = false;
+		return false;
 	}
 	
 	void TeleopPeriodic() override {
@@ -124,5 +170,7 @@ private:
 	std::unique_ptr<frc::Command> autonomousCommand;
 	frc::SendableChooser<frc::Command*> chooser;
 };
+
+
 
 START_ROBOT_CLASS(Robot)
