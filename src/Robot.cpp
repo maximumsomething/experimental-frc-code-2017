@@ -105,6 +105,7 @@ public:
 		
 		cs::CvSink frontSink = CameraServer::GetInstance()->GetVideo("cam0");
 		cs::CvSink backSink = CameraServer::GetInstance()->GetVideo("cam1");
+		backSink.SetEnabled(false);
 		
 		cs::CvSource output = CameraServer::GetInstance()->PutVideo("Camera", 640, 480);
 		
@@ -112,8 +113,17 @@ public:
 		while(true) {
 		// access once for thread safety
 			bool usingFront = theRobot->usingFrontCamera;
-			if (usingFront) pushFrame(frontSink, output, mat);
-			else pushFrame(backSink, output, mat);
+			
+			if (usingFront) {
+				frontSink.SetEnabled(true);
+				backSink.SetEnabled(false);
+				pushFrame(frontSink, output, mat);
+			}
+			else {
+				backSink.SetEnabled(true);
+				frontSink.SetEnabled(false);
+				pushFrame(backSink, output, mat);
+			}
 		}
 	}
 	static void pushFrame(cs::CvSink sink, cs::CvSource output, cv::Mat reusableMat) {
