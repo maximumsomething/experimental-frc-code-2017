@@ -26,7 +26,7 @@ class Robot: public frc::IterativeRobot {
 public:
 	
 	frc::Joystick* stick;
-	NetworkTable* netTable;
+	//NetworkTable* netTable;
 	
 	
 	void RobotInit() override {
@@ -36,13 +36,22 @@ public:
 		// chooser.AddObject("My Auto", new MyAutoCommand());
 		frc::SmartDashboard::PutData("Auto Modes", &chooser);
 		
-		CameraServer::GetInstance()->StartAutomaticCapture(0);
+		//CameraServer::GetInstance()->StartAutomaticCapture(0);
 		
 		stick = new frc::Joystick(0);
-		netTable = NetworkTable::GetTable("datatable");
+		//netTable = NetworkTable::GetTable("datatable");
 		
+
+		cs::UsbCamera cam0 = CameraServer::GetInstance()->StartAutomaticCapture("front", 0);
+		cam0.SetResolution(320, 240);
+		cs::UsbCamera cam1 = CameraServer::GetInstance()->StartAutomaticCapture("back", 1);
+		cam1.SetResolution(320, 240);
+
+
 		std::thread cameraThreadObj(cameraThread);
 		cameraThreadObj.detach();
+
+		printf("initialized robot");
 	}
 
 	/**
@@ -102,23 +111,23 @@ public:
 	
 	static void cameraThread() {
 		
-		cs::CvSource output = CameraServer::GetInstance()->PutVideo("Camera", 640, 480);
+		cs::CvSource output = CameraServer::GetInstance()->PutVideo("Camera", 320, 240);
 		
-		cs::UsbCamera cam0 = CameraServer::GetInstance()->StartAutomaticCapture(0);
-		cam0.SetResolution(640, 480);
-		cs::UsbCamera cam1 = CameraServer::GetInstance()->StartAutomaticCapture(1);
-		cam1.SetResolution(640, 480);
-		
-		cs::CvSink frontSink = CameraServer::GetInstance()->GetVideo("cam0");
-		cs::CvSink backSink = CameraServer::GetInstance()->GetVideo("cam1");
-		backSink.SetEnabled(false);
-		
-		
-		
+		//cs::UsbCamera cam0 = CameraServer::GetInstance()->StartAutomaticCapture(0);
+		//cam0.SetResolution(640, 480);
+		//cs::UsbCamera cam1 = CameraServer::GetInstance()->StartAutomaticCapture(1);
+		//cam1.SetResolution(640, 480);
+
+		cs::CvSink frontSink = CameraServer::GetInstance()->GetVideo("front");
+		cs::CvSink backSink = CameraServer::GetInstance()->GetVideo("back");
+		//backSink.SetEnabled(false);
+
+
+
 		cv::Mat mat;
 		while(true) {
 		// access once for thread safety
-			bool usingFront = theRobot->usingFrontCamera;
+			volatile bool usingFront = theRobot->usingFrontCamera;
 			
 			if (usingFront) {
 				frontSink.SetEnabled(true);
@@ -174,12 +183,14 @@ public:
 	
 	
 	
-	bool usingFrontCamera = true;
+	volatile bool usingFrontCamera = true;
 	void toggleCamera() {
 		usingFrontCamera = !usingFrontCamera;
 		
-		if (usingFrontCamera) CameraServer::GetInstance()->StartAutomaticCapture(0);
-		else CameraServer::GetInstance()->StartAutomaticCapture(1);
+		printf("toggling cameras");
+
+		//if (usingFrontCamera) CameraServer::GetInstance()->StartAutomaticCapture(0);
+		//else CameraServer::GetInstance()->StartAutomaticCapture(1);
 	}
 
 private:
