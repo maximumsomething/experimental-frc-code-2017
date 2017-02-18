@@ -26,7 +26,7 @@ class Robot: public frc::IterativeRobot {
 public:
 	
 	frc::Joystick* stick;
-	
+	NetworkTable* netTable;
 	
 	
 	void RobotInit() override {
@@ -39,6 +39,7 @@ public:
 		CameraServer::GetInstance()->StartAutomaticCapture(0);
 		
 		stick = new frc::Joystick(0);
+		netTable = NetworkTable::GetTable("datatable");
 		
 		std::thread cameraThreadObj(cameraThread);
 		cameraThreadObj.detach();
@@ -100,14 +101,19 @@ public:
 	
 	
 	static void cameraThread() {
-		CameraServer::GetInstance()->StartAutomaticCapture(1);
-		CameraServer::GetInstance()->StartAutomaticCapture(0);
+		
+		cs::CvSource output = CameraServer::GetInstance()->PutVideo("Camera", 640, 480);
+		
+		cs::UsbCamera cam0 = CameraServer::GetInstance()->StartAutomaticCapture(0);
+		cam0.SetResolution(640, 480);
+		cs::UsbCamera cam1 = CameraServer::GetInstance()->StartAutomaticCapture(1);
+		cam1.SetResolution(640, 480);
 		
 		cs::CvSink frontSink = CameraServer::GetInstance()->GetVideo("cam0");
 		cs::CvSink backSink = CameraServer::GetInstance()->GetVideo("cam1");
 		backSink.SetEnabled(false);
 		
-		cs::CvSource output = CameraServer::GetInstance()->PutVideo("Camera", 640, 480);
+		
 		
 		cv::Mat mat;
 		while(true) {
@@ -126,7 +132,7 @@ public:
 			}
 		}
 	}
-	static void pushFrame(cs::CvSink sink, cs::CvSource output, cv::Mat reusableMat) {
+	static void pushFrame(cs::CvSink& sink, cs::CvSource& output, cv::Mat& reusableMat) {
 		if (sink.GrabFrame(reusableMat) == 0) {
 			// Send the output the error.
 			output.NotifyError(sink.GetError());
